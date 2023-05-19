@@ -15,8 +15,8 @@ import org.firstinspires.ftc.teamcode.drive.PIDFController;
 public class DrivePIDTest extends LinearOpMode {
 
     public static double x=0,y=0,theta=0;
-    public static double Kpx= 0.08, Kix= 0, Kdx = 0.4, Kfx = 0;
-    public static double Kpy= -0.25, Kiy= 0, Kdy = -0.3, Kfy = 0;
+    public static double Kpx= -0.08, Kix= 0, Kdx = -0.4, Kfx = 0;
+    public static double Kpy= 0.25, Kiy= 0, Kdy = 0.3, Kfy = 0;
 
     public static double Kptheta= -0.05, Kitheta= 0, Kdtheta = -0.05, Kftheta = 0;
 
@@ -54,6 +54,9 @@ public class DrivePIDTest extends LinearOpMode {
             double powertheta = thetacontroller.calculate(localization.getRobotPose().getHeading(), theta);
 
             drivetrain.calculateMotorSpeeds(-powery, -powerx,powertheta);
+            telemetry.addData("X:", localization.getRobotPose().getX());
+            telemetry.addData("Y:", localization.getRobotPose().getY());
+            telemetry.addData("Heagin:", localization.getRobotPose().getHeading());
 //            telemetry.addData("power", powerx);
             telemetry.update();
         }

@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.drive;
 
 import com.acmerobotics.dashboard.config.Config;
+import com.acmerobotics.roadrunner.geometry.Vector2d;
 import com.acmerobotics.roadrunner.profile.MotionProfile;
 import com.acmerobotics.roadrunner.profile.MotionProfileGenerator;
 import com.acmerobotics.roadrunner.profile.MotionState;
@@ -15,10 +16,12 @@ public class DriveController {
     MotionProfile driveProfile;
     Drivetrain drivetrain;
 //    public static double x=0,y=0,theta=0;
-    public static double Kpx= 0.08, Kix= 0, Kdx = 0.4, Kfx = 0;
-    public static double Kpy= -0.25, Kiy= 0, Kdy = -0.3, Kfy = 0;
 
-    public static double Kptheta= -0.05, Kitheta= 0, Kdtheta = -0.05, Kftheta = 0;
+    public double targetX, targetY, targetHeading;
+public static double Kpx= -0.08, Kix= 0, Kdx = -0.4, Kfx = 0;
+    public static double Kpy= 0.25, Kiy= 0, Kdy = 0.3, Kfy = 0;
+
+    public static double Kptheta= -0.01, Kitheta= 0, Kdtheta = -0.05, Kftheta = 0;
 
     PIDFController xcontroller, ycontroller, thetacontroller;
 
@@ -50,12 +53,24 @@ public class DriveController {
         return xcontroller.isAtTarget() && ycontroller.isAtTarget() && thetacontroller.isAtTarget();
     }
 
-    public void update(){
-        MotionState xState = motionProfilex.get(timer.seconds());
-        MotionState yState = motionProfiley.get(timer.seconds());
-        MotionState thetaState = motionProfiletheta.get(timer.seconds());
+    public boolean isFinished(){
+        if(motionProfiley !=null) {
+            boolean stateFinishedX = areWithinRange(localization.getRobotPose().getX(), targetX, 3.0);
+            boolean stateFinishedY = areWithinRange(localization.getRobotPose().getY(), targetY, 3.0);
+            boolean stateFinishedHeading = areWithinRange(localization.getRobotPose().getHeading(), targetHeading, 2.0);
+            return stateFinishedX && stateFinishedY && stateFinishedHeading;
+        }
+        else return true;
+    }
 
-        setPosition(xState.getX(), yState.getX(), thetaState.getX());
+    public void update(){
+        if(motionProfiletheta != null) {
+            MotionState xState = motionProfilex.get(timer.seconds());
+            MotionState yState = motionProfiley.get(timer.seconds());
+            MotionState thetaState = motionProfiletheta.get(timer.seconds());
+            setPosition(xState.getX(), yState.getX(), thetaState.getX());
+        }
+
     }
 
     public void goTo(double x, double y, double theta){
@@ -63,9 +78,14 @@ public class DriveController {
     }
 
     public void goTo(double x, double y, double theta, double maxVel, double maxAccel, double maxAngVel, double maxAngAccel){
+
+
+        targetX = x;
+        targetY = y;
+        targetHeading = theta;
+        double currentHeading = localization.getRobotPose().getHeading();
         double currentx = localization.getRobotPose().getX();
         double currenty = localization.getRobotPose().getY();
-        double currentHeading = localization.getRobotPose().getHeading();
         motionProfilex = MotionProfileGenerator.generateSimpleMotionProfile(
            new MotionState(currentx,0,0),
                 new MotionState(x, 0, 0),
@@ -87,7 +107,11 @@ public class DriveController {
                 maxAngAccel
         );
         timer.reset();
+    }
 
+    public boolean areWithinRange(double num1, double num2, double range) {
+        double difference = Math.abs(num1 - num2);
+        return difference <= range;
     }
 
 

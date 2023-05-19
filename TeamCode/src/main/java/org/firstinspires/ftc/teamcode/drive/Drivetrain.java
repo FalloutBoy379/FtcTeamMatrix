@@ -4,6 +4,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
@@ -27,10 +28,11 @@ public class Drivetrain {
 
         rightRear.setDirection(DcMotorSimple.Direction.REVERSE);
         rightFront.setDirection(DcMotorSimple.Direction.REVERSE);
+//        leftFront.setDirection(DcMotorSimple.Direction.REVERSE);
     }
 
 
-    public void calculateMotorSpeeds(double forwardBackward, double strafe, double rotation) {
+    public void calculateMotorSpeeds(double strafe, double forwardBackward, double rotation) {
         double frontLeftSpeed = forwardBackward + strafe + rotation;
         double frontRightSpeed = forwardBackward - strafe - rotation;
         double rearLeftSpeed = forwardBackward - strafe + rotation;
@@ -63,9 +65,23 @@ public class Drivetrain {
         telemetry.addData("Right Front: ", rightFront.getCurrent(CurrentUnit.AMPS));
         telemetry.addData("Left Rear: ", leftRear.getCurrent(CurrentUnit.AMPS));
         telemetry.addData("Right Rear: ", rightRear.getCurrent(CurrentUnit.AMPS));
-        leftFront.setPower(frontLeft);
-        leftRear.setPower(rearLeft);
-        rightFront.setPower(frontRight);
-        rightRear.setPower(rearRight);
+
+        double frontMax = Math.max(Math.abs(frontLeft), Math.abs(frontRight));
+        double rearMax = Math.max(Math.abs(rearLeft), Math.abs(rearRight));
+        double totalMax = Math.max(frontMax, rearMax);
+
+        if(totalMax>1.0) {
+            leftFront.setPower(frontLeft / totalMax);
+            leftRear.setPower(rearLeft / totalMax);
+            rightFront.setPower(frontRight / totalMax);
+            rightRear.setPower(rearRight / totalMax);
+        }
+        else{
+            totalMax = 1;
+            leftFront.setPower(frontLeft / totalMax);
+            leftRear.setPower(rearLeft / totalMax);
+            rightFront.setPower(frontRight / totalMax);
+            rightRear.setPower(rearRight / totalMax);
+        }
     }
 }

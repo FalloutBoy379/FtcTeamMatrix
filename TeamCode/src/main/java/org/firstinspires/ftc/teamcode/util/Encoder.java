@@ -51,7 +51,7 @@ public class Encoder {
     public Encoder(DcMotorEx motor, NanoClock clock) {
         this.motor = motor;
         this.clock = clock;
-        reset();
+//        reset();
         this.direction = Direction.FORWARD;
 
         this.lastPosition = 0;
