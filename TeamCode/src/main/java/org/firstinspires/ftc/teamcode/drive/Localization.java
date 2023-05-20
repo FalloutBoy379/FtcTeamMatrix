@@ -14,6 +14,7 @@ import org.firstinspires.ftc.teamcode.util.Encoder;
 import org.firstinspires.ftc.teamcode.util.MatrixUtils;
 
 
+@Config
 public class Localization {
 
 
@@ -24,6 +25,8 @@ public class Localization {
     private double prevY;
     private double heading;
     boolean headingSourceisImu = false;
+
+    public static double FORWARD_OFFSET = 2.5;
 
     private double xOffset, yOffset, thetaOffset;
     private BNO055IMU imu;
@@ -48,13 +51,13 @@ public class Localization {
     }
 
     public Pose2d getRobotPose(){
-        double[] poseArray = calculatePose(getEncoderCounts(), 1.49606, 9.9102, 1.25);
+        double[] poseArray = calculatePose(getEncoderCounts(), 1.49606, 9.9102, FORWARD_OFFSET);
         Pose2d robotPose = new Pose2d(poseArray[0], poseArray[1], poseArray[2]);
         return robotPose;
     }
 
     public Pose2d getRobotPoseinFieldCoordinates(){
-        double[] poseArray = calculatePose(getEncoderCounts(), 1.49606, 9.9102, 1.25);
+        double[] poseArray = calculatePose(getEncoderCounts(), 1.49606, 9.9102, FORWARD_OFFSET);
         Pose2d robotPose = new Pose2d(poseArray[0], poseArray[1], poseArray[2]);
         updatePosition(robotPose.getX(), robotPose.getY(), robotPose.getHeading());
         return new Pose2d(fieldX, fieldY, heading);
@@ -95,6 +98,38 @@ public class Localization {
     }
 
 
+    public double[] calculatePose2_0(double[] encoders, double wheelDiameter, double L, double FO){
+        double TICKS_PER_REVOLUTION = 8192;
+        double ticksPerInch = TICKS_PER_REVOLUTION / (Math.PI * wheelDiameter);
+        double wheelCircumference = Math.PI * wheelDiameter;
+        double distancePerTick = wheelCircumference / TICKS_PER_REVOLUTION;
+
+        double leftTicks = encoders[0];
+        double rightTicks = encoders[1];
+        double perpTicks = encoders[2];
+
+
+        double theta;
+        if(headingSourceisImu){
+            theta = getIntegratedHeading();
+        }else {
+            theta = (rightTicks - leftTicks) * distancePerTick / L;
+        }
+
+        double x = (leftTicks+rightTicks) * 0.5 * distancePerTick;
+        double y = 0;
+        if (perpTicks != 0) {
+            y = (perpTicks * distancePerTick - (FO * Math.toRadians(theta)));
+        }
+
+
+//        Vector2d pose = new Vector2d(x, y);
+//        pose = pose.rotated(theta);
+
+        return new double[]{x - xOffset, y - yOffset, Math.toDegrees(theta) - thetaOffset};
+
+
+    }
 
     public double[] calculatePose(double[] encoders, double wheelDiameter, double wheelDistance, double forwardOffset) {
         double TICKS_PER_REVOLUTION = 8192;
@@ -116,7 +151,7 @@ public class Localization {
         double x = (leftTicks+rightTicks) * 0.5 * distancePerTick;
         double y = 0;
         if (perpTicks != 0) {
-            y = (perpTicks * distancePerTick - (forwardOffset));
+            y = (perpTicks * distancePerTick - (forwardOffset * Math.toRadians(theta)));
         }
 
 
