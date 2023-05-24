@@ -6,35 +6,29 @@ import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
-import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
-import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
+
 import org.firstinspires.ftc.teamcode.util.Encoder;
-import org.firstinspires.ftc.teamcode.util.MatrixUtils;
 
 
 @Config
 public class Localization {
 
-
-
     private double fieldX;
     private double fieldY;
-    private double prevX;
-    private double prevY;
     private double heading;
     boolean headingSourceisImu = false;
 
-    public static double FORWARD_OFFSET = 2.5;
+    public static double FORWARD_OFFSET = 1.2732;   //inches
 
     private double xOffset, yOffset, thetaOffset;
-    private BNO055IMU imu;
+    public BNO055IMU imu;
     public  static double leftMulti = 1;
     public static double X_MULTIPLIER = 1.017656780029573 * 0.975609756097561 * 0.9969481180061038; // Multiplier in the X direction
     public static double Y_MULTIPLIER = 0.9783938035059111 * 0.9921414538310413; // Multiplier in the Y direction
 
-    private Encoder leftEncoder, rightEncoder, frontEncoder;
+    private final Encoder leftEncoder;
+    private final Encoder rightEncoder;
+    private final Encoder frontEncoder;
 
     public Localization(HardwareMap hardwareMap){
         fieldX = 0.0;
@@ -52,8 +46,7 @@ public class Localization {
 
     public Pose2d getRobotPose(){
         double[] poseArray = calculatePose(getEncoderCounts(), 1.49606, 9.9102, FORWARD_OFFSET);
-        Pose2d robotPose = new Pose2d(poseArray[0], poseArray[1], poseArray[2]);
-        return robotPose;
+        return new Pose2d(poseArray[0], poseArray[1], poseArray[2]);
     }
 
     public Pose2d getRobotPoseinFieldCoordinates(){
@@ -72,8 +65,8 @@ public class Localization {
         double changeYTransformed = deltaX * Math.sin(headingRad) + deltaY * Math.cos(headingRad);
 
         // Update the robot's position in the field coordinate system
-        fieldX = changeXTransformed;
-        fieldY = changeYTransformed;
+        fieldX += changeXTransformed;
+        fieldY += changeYTransformed;
 
         heading = newHeading;
     }
@@ -83,12 +76,19 @@ public class Localization {
         double leftEncoderCounts = leftEncoder.getCurrentPosition() * X_MULTIPLIER * leftMulti;
         double rightEncoderCounts = rightEncoder.getCurrentPosition() * X_MULTIPLIER;
         double perpEncoderCounts = frontEncoder.getCurrentPosition() * Y_MULTIPLIER;
-        double[] encoders = {leftEncoderCounts, rightEncoderCounts, perpEncoderCounts};
-        return encoders;
+        return new double[]{leftEncoderCounts, rightEncoderCounts, perpEncoderCounts};
     }
 
     public void setHeadingSourceImu(boolean flag){
+        if(flag && !headingSourceisImu){
+            getOffsetFromIMUToSolveForDrift();
+        }
         headingSourceisImu = flag;
+
+    }
+
+    public void getOffsetFromIMUToSolveForDrift(){
+        thetaOffset = thetaOffset - (getIntegratedHeading() - heading);
     }
 
     public void resetPose(){
@@ -97,41 +97,8 @@ public class Localization {
         thetaOffset = getRobotPose().getHeading() + thetaOffset;
     }
 
-
-    public double[] calculatePose2_0(double[] encoders, double wheelDiameter, double L, double FO){
-        double TICKS_PER_REVOLUTION = 8192;
-        double ticksPerInch = TICKS_PER_REVOLUTION / (Math.PI * wheelDiameter);
-        double wheelCircumference = Math.PI * wheelDiameter;
-        double distancePerTick = wheelCircumference / TICKS_PER_REVOLUTION;
-
-        double leftTicks = encoders[0];
-        double rightTicks = encoders[1];
-        double perpTicks = encoders[2];
-
-
-        double theta;
-        if(headingSourceisImu){
-            theta = getIntegratedHeading();
-        }else {
-            theta = (rightTicks - leftTicks) * distancePerTick / L;
-        }
-
-        double x = (leftTicks+rightTicks) * 0.5 * distancePerTick;
-        double y = 0;
-        if (perpTicks != 0) {
-            y = (perpTicks * distancePerTick - (FO * Math.toRadians(theta)));
-        }
-
-
-//        Vector2d pose = new Vector2d(x, y);
-//        pose = pose.rotated(theta);
-
-        return new double[]{x - xOffset, y - yOffset, Math.toDegrees(theta) - thetaOffset};
-
-
-    }
-
-    public double[] calculatePose(double[] encoders, double wheelDiameter, double wheelDistance, double forwardOffset) {
+    public double[] calculatePose(double[] encoders, double wheelDiameter, double wheelDistance, double forwardOffsetInches) {
+        double forwardOffset = forwardOffsetInches * Math.toDegrees(1);
         double TICKS_PER_REVOLUTION = 8192;
         double ticksPerInch = TICKS_PER_REVOLUTION / (Math.PI * wheelDiameter);
         double wheelCircumference = Math.PI * wheelDiameter;
@@ -143,22 +110,24 @@ public class Localization {
 
         double theta;
         if(headingSourceisImu){
-            theta = getIntegratedHeading();
+            theta = this.imu.getAngularOrientation().firstAngle;
         }else {
-            theta = (rightTicks - leftTicks) * distancePerTick / wheelDistance;
+            theta = -((rightTicks - leftTicks) * distancePerTick / wheelDistance);
         }
 
         double x = (leftTicks+rightTicks) * 0.5 * distancePerTick;
         double y = 0;
         if (perpTicks != 0) {
-            y = (perpTicks * distancePerTick - (forwardOffset * Math.toRadians(theta)));
+            y = (perpTicks * distancePerTick )- (forwardOffset * Math.toRadians(theta));
         }
 
+        if(headingSourceisImu){
+            return new double[]{x - xOffset, y - yOffset, Math.toDegrees(theta)};
+        }
+        else{
+            return new double[]{x - xOffset, y - yOffset, Math.toDegrees(theta) - thetaOffset};
+        }
 
-//        Vector2d pose = new Vector2d(x, y);
-//        pose = pose.rotated(theta);
-
-        return new double[]{x - xOffset, y - yOffset, Math.toDegrees(theta) - thetaOffset};
     }
 
     private void initializeIMU(HardwareMap hardwareMap) {
@@ -174,11 +143,11 @@ public class Localization {
     /**
      * This method returns a value of the Z axis of the REV Expansion Hub IMU.
      * It transforms the value from (-180, 180) to (-inf, inf).
-     * This code was taken and modified from https://ftcforum.usfirst.org/forum/ftc-technology/53477-rev-imu-questions?p=53481#post53481.
+     * This code was taken and modified from <a href="https://ftcforum.usfirst.org/forum/ftc-technology/53477-rev-imu-questions?p=53481#post53481">...</a>.
      * @return The integrated heading on the interval (-inf, inf).
      */
     private double getIntegratedHeading() {
-        double currentHeading = imu.getAngularOrientation().firstAngle;
+        double currentHeading = Math.toDegrees(imu.getAngularOrientation().firstAngle);
         double deltaHeading = currentHeading - previousHeading;
 
         if (deltaHeading < -180) {
@@ -190,6 +159,6 @@ public class Localization {
         integratedHeading += deltaHeading;
         previousHeading = currentHeading;
 
-        return integratedHeading;
+    return integratedHeading;
     }
 }
